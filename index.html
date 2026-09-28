@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#161d29" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#eef1f5" media="(prefers-color-scheme: light)">
+<meta name="color-scheme" content="dark light">
+<title>TPS Parser Pro</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<style>
+  :root {
+    --bg: #161d29; --surface: #1f2837; --well: #121822; --line: #334157;
+    --text: #e6ebf2; --muted: #93a1b8; --amber: #f0b429; --amber-ink: #231a00;
+    --ok: #6fcf97; --missing: #f0b429;
+    --r-lg: 14px; --r-sm: 8px;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #eef1f5; --surface: #ffffff; --well: #f7f9fb; --line: #cfd7e2;
+      --text: #172030; --muted: #5a6780; --amber: #f0b429; --amber-ink: #231a00;
+      --ok: #1e8a52; --missing: #b07800;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body {
+    font-family: system-ui, "SamsungOne", Roboto, "Segoe UI", sans-serif;
+    font-size: 1rem; line-height: 1.45;
+    padding: max(12px, env(safe-area-inset-top)) 14px calc(96px + env(safe-area-inset-bottom));
+    max-width: 560px; margin-inline: auto;
+    -webkit-tap-highlight-color: transparent;
+  }
+  header { display: flex; align-items: baseline; justify-content: space-between; margin: 4px 2px 12px; }
+  h1 { font-size: 1.15rem; font-weight: 700; margin: 0; letter-spacing: -0.01em; }
+  #net { font-size: .8rem; color: var(--muted); }
+  #net.ready { color: var(--ok); }
+
+  textarea {
+    display: block; width: 100%; height: 28vh; min-height: 150px; resize: vertical;
+    background: var(--well); color: var(--text);
+    border: 1.5px solid var(--line); border-radius: var(--r-lg);
+    padding: 14px; font: inherit; font-size: .95rem;
+  }
+  textarea:focus { outline: none; border-color: var(--amber); }
+
+  .row { display: flex; gap: 10px; margin-top: 10px; }
+  button {
+    min-height: 48px; font: inherit; font-weight: 600; cursor: pointer;
+    border-radius: var(--r-sm); border: 1.5px solid var(--line);
+    background: var(--surface); color: var(--text); padding: 0 16px;
+  }
+  button:focus-visible, input:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
+  button:active { transform: scale(.98); }
+  .row > button { flex: 1; }
+
+  .opts { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 14px 2px 0; font-size: .9rem; color: var(--muted); }
+  .opts label { display: flex; align-items: center; gap: 8px; min-height: 40px; }
+  .opts input { width: 20px; height: 20px; accent-color: var(--amber); }
+
+  .card {
+    margin-top: 16px; background: var(--surface);
+    border: 1.5px solid var(--line); border-radius: var(--r-lg); overflow: hidden;
+  }
+  .field { display: grid; grid-template-columns: 76px 1fr 48px; align-items: center; border-top: 1px solid var(--line); }
+  .field:first-child { border-top: 0; }
+  .field label { padding-left: 14px; font-size: .85rem; color: var(--muted); }
+  .field input {
+    width: 100%; min-height: 52px; background: transparent; color: var(--text);
+    border: 0; font: inherit; font-size: 1rem; padding: 8px 6px;
+  }
+  .field.missing { box-shadow: inset 4px 0 0 var(--missing); }
+  .field.missing input::placeholder { color: var(--missing); opacity: 1; }
+  .field button { border: 0; background: transparent; min-height: 52px; padding: 0; color: var(--muted); }
+  .field button svg { width: 20px; height: 20px; }
+  .field button.done { color: var(--ok); }
+
+  .alts { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 14px 12px 90px; }
+  .alts:empty { display: none; }
+  .alts button { min-height: 40px; font-size: .85rem; font-weight: 500; padding: 0 12px; border-radius: 20px; }
+  .alts button.on { border-color: var(--amber); }
+
+  .empty { color: var(--muted); font-size: .9rem; margin: 14px 4px 0; }
+
+  .dock {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
+    background: linear-gradient(to top, var(--bg) 70%, transparent);
+  }
+  #copyAll {
+    display: block; width: 100%; max-width: 532px; margin: 0 auto; min-height: 56px;
+    background: var(--amber); color: var(--amber-ink); border: 0; font-size: 1.05rem;
+  }
+  #copyAll:disabled { opacity: .45; }
+  #copyAll.done { background: var(--ok); color: #03170b; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  @media (prefers-reduced-motion: reduce) { button:active { transform: none; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>TPS Parser Pro</h1>
+  <span id="net">Runs on this phone</span>
+</header>
+
+<label for="raw" class="sr">Raw profile text</label>
+<textarea id="raw" placeholder="Paste raw profile text here..." autocomplete="off" autocorrect="off" spellcheck="false"></textarea>
+
+<div class="row">
+  <button id="pasteBtn" type="button">Paste</button>
+  <button id="clearBtn" type="button">Clear</button>
+</div>
+
+<div class="opts">
+  <label><input type="checkbox" id="optFirstLast"> First + last name only</label>
+  <label><input type="checkbox" id="optPretty"> Phone as (847) 549-6228</label>
+</div>
+
+<p class="empty" id="hint">Fields fill in as soon as you paste. You can edit any field before copying.</p>
+
+<div class="card" id="card">
+  <div class="field" data-k="name"><label for="f-name">Name</label><input id="f-name" placeholder="N/A"><button type="button" aria-label="Copy name"></button></div>
+  <div class="field" data-k="age"><label for="f-age">Age</label><input id="f-age" inputmode="numeric" placeholder="N/A"><button type="button" aria-label="Copy age"></button></div>
+  <div class="field" data-k="phone"><label for="f-phone">Phone #</label><input id="f-phone" inputmode="tel" placeholder="N/A"><button type="button" aria-label="Copy phone"></button></div>
+  <div class="alts" id="alts"></div>
+  <div class="field" data-k="address"><label for="f-address">Address</label><input id="f-address" placeholder="N/A"><button type="button" aria-label="Copy address"></button></div>
+  <div class="field" data-k="county"><label for="f-county">County</label><input id="f-county" placeholder="N/A"><button type="button" aria-label="Copy county"></button></div>
+</div>
+
+<div class="dock"><button id="copyAll" type="button" disabled>Copy result</button></div>
+
+<script>
+/* TPS Parser — pure parsing logic, no DOM */
+const Parser = (() => {
+  const STATES = new Set("AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY DC PR GU VI".split(" "));
+
+  const STOP = new Set(("sign log search menu home privacy policy terms contact about opt remove view details report " +
+    "background free people find results lookup reverse phone phones address addresses email emails current previous past " +
+    "relatives associates map directions show more less back top next page click here record records public check " +
+    "update claim profile info information county age born wireless landline voip also seen known lives deceased " +
+    "possible neighbors business owner criminal court property login register welcome name").split(" "));
+
+  const SUFFIX = new Set(("st street ave avenue av rd road dr drive ln lane blvd boulevard ct court cir circle way pl place " +
+    "ter terrace trl trail pkwy parkway hwy highway xing crossing loop sq square run pt point pass path pike row walk aly alley " +
+    "bnd bend cv cove holw hollow hts heights mnr manor mdw mdws park plz plaza rdg ridge vw view vly valley grn green gln glen " +
+    "crk creek cres crest tpke expy fwy commons cmns lndg landing").split(" "));
+  const UNIT_KW = /^(apt|apartment|unit|ste|suite|lot|rm|room|bldg|fl|floor|spc|space|trlr)\.?$/i;
+  const DIR = /^(n|s|e|w|ne|nw|se|sw)\.?$/i;
+  const SUFFIX_NAME = /^(jr|sr|ii|iii|iv|v)\.?$/i;
+
+  const titleCase = s => s.toLowerCase().replace(/(^|[\s\-'’])([a-z])/g, (m, a, b) => a + b.toUpperCase())
+    .replace(/\bMc([a-z])/g, (m, c) => "Mc" + c.toUpperCase());
+  const fixCaps = s => (s && s === s.toUpperCase() && /[A-Z]{2}/.test(s)) ? titleCase(s) : s;
+  const clean = s => s.replace(/[\u00a0\t]+/g, " ").replace(/\s+/g, " ").trim();
+
+  function looksLikeName(s) {
+    s = clean(s);
+    if (s.length < 3 || s.length > 60 || /[\d@:|/\\]/.test(s)) return false;
+    const w = s.split(" ");
+    if (w.length < 2 || w.length > 5) return false;
+    if (w.some(x => STOP.has(x.toLowerCase().replace(/[.,]/g, "")))) return false;
+    return w.every(x => /^[A-Z][A-Za-z'’.\-]*,?$/.test(x) || /^(de|la|van|von|del|da|di|le|du)$/i.test(x));
+  }
+
+  function findName(lines, ageIdx) {
+    for (const l of lines) {
+      const m = l.match(/^\s*(?:full\s+)?name\s*[:\-]\s*(.+)$/i);
+      if (m && looksLikeName(m[1])) return clean(m[1]);
+    }
+    const strip = l => clean(l.replace(/[,\s]*\b(age|aged)\b.*$/i, "").replace(/,$/, ""));
+    if (ageIdx >= 0) {
+      for (let i = ageIdx; i >= Math.max(0, ageIdx - 4); i--) {
+        const c = strip(lines[i]);
+        if (looksLikeName(c)) return c;
+      }
+    }
+    for (let i = 0; i < Math.min(lines.length, 25); i++) {
+      const c = strip(lines[i]);
+      if (looksLikeName(c)) return c;
+    }
+    return "";
+  }
+
+  function findAge(lines) {
+    for (let i = 0; i < lines.length; i++) {
+      const m = lines[i].match(/\bAge[d]?\s*[:\-]?\s*(\d{1,3})\b/i) || lines[i].match(/\b(\d{1,3})\s*(?:years?\s*old|yrs?\s*old)\b/i);
+      if (m && +m[1] > 0 && +m[1] < 125) return { age: m[1], idx: i };
+    }
+    return { age: "", idx: -1 };
+  }
+
+  function findPhones(lines) {
+    const re = /(?:\+?1[\s.\-]?)?\(?\b([2-9]\d{2})\)?[\s.\-]?([2-9]\d{2})[\s.\-]?(\d{4})\b/g;
+    const out = [], seen = new Set();
+    let sectionIdx = lines.findIndex(l => /^\s*(phone numbers?|phones?|current phone|primary phone)\b/i.test(l));
+    lines.forEach((l, i) => {
+      let m; re.lastIndex = 0;
+      while ((m = re.exec(l))) {
+        const d = m[1] + m[2] + m[3];
+        if (seen.has(d)) continue;
+        seen.add(d);
+        const t = (l.match(/\b(wireless|mobile|cell|landline|voip)\b/i) || lines[i + 1]?.match(/^\s*-?\s*(wireless|mobile|cell|landline|voip)\b/i) || [])[1] || "";
+        out.push({ digits: d, type: t ? titleCase(t) : "", idx: i });
+      }
+    });
+    // Drop landlines entirely
+    const kept = out.filter(p => p.type !== "Landline");
+    // Primary = first wireless number (in the phone section if there is one), else first remaining number
+    const isWireless = p => /^(wireless|mobile|cell)$/i.test(p.type);
+    let first = kept.findIndex(p => isWireless(p) && (sectionIdx < 0 || p.idx >= sectionIdx));
+    if (first < 0) first = kept.findIndex(isWireless);
+    if (first < 0 && sectionIdx >= 0) first = kept.findIndex(p => p.idx >= sectionIdx);
+    if (first > 0) kept.unshift(kept.splice(first, 1)[0]);
+    return kept;
+  }
+
+  function splitStreetCity(s) {
+    const t = s.split(" ");
+    let unitCut = -1, sufCut = -1;
+    for (let i = 1; i < t.length - 1; i++) {
+      const w = t[i].replace(/[.,]$/, "").toLowerCase();
+      if (t[i].startsWith("#")) unitCut = t[i] === "#" ? i + 1 : i;
+      else if (UNIT_KW.test(t[i]) && i + 1 < t.length - 1) { unitCut = i + 1; i++; }
+      else if (SUFFIX.has(w) && i >= 1) {
+        sufCut = i;
+        if (DIR.test(t[i + 1] || "") && i + 1 < t.length - 1) sufCut = i + 1;
+      }
+    }
+    const cut = unitCut >= 0 ? unitCut : sufCut;
+    if (cut < 0 || cut >= t.length - 1) return null;
+    return { street: t.slice(0, cut + 1).join(" "), city: t.slice(cut + 1).join(" ") };
+  }
+
+  const isStreet = s => /^\d+[A-Za-z]?\s+\S/.test(s) || /^p\.?\s?o\.?\s*box\b/i.test(s);
+
+  function findAddresses(lines) {
+    const out = [];
+    const re = /^(.*?)\s*,?\s*\b([A-Z]{2})\s+(\d{5}(?:-\d{4})?)\b/;
+    lines.forEach((raw, i) => {
+      const l = clean(raw);
+      const m = l.match(re);
+      if (!m || !STATES.has(m[2])) return;
+      let before = clean(m[1]).replace(/,$/, "");
+      before = before.replace(/^(lives in|current address|address|located in|resides in)\s*[:\-]?\s*/i, "");
+      let street = "", city = "";
+      if (before.includes(",")) {
+        const k = before.lastIndexOf(",");
+        street = clean(before.slice(0, k)); city = clean(before.slice(k + 1));
+        if (!isStreet(street)) { city = before; street = ""; }
+      } else if (isStreet(before)) {
+        const sp = splitStreetCity(before);
+        if (sp) ({ street, city } = sp); else { street = before; }
+      } else {
+        city = before;
+      }
+      if (!street && i > 0) {
+        let p = clean(lines[i - 1]);
+        if (/^(apt|apartment|unit|ste|suite|#|lot)\b/i.test(p) && i > 1 && isStreet(clean(lines[i - 2]))) {
+          p = clean(lines[i - 2]) + " " + p;
+        }
+        if (isStreet(p) && !re.test(p)) street = p.replace(/,$/, "");
+      }
+      if (!city) return;
+      out.push({ street: fixCaps(street), city: fixCaps(city), state: m[2], zip: m[3], idx: i });
+    });
+    return out;
+  }
+
+  function findCounty(lines, nearIdx) {
+    const re = /\b([A-Z][A-Za-z.'’\-]*(?:\s+[A-Z][A-Za-z.'’\-]*){0,3})\s+(County|Parish|Borough)\b/gi;
+    const found = [];
+    lines.forEach((l, i) => {
+      let m; re.lastIndex = 0;
+      while ((m = re.exec(l))) {
+        let words = m[1].split(/\s+/);
+        while (words.length && STOP.has(words[0].toLowerCase())) words.shift();
+        if (!words.length || !/^[A-Z]/.test(words[0])) continue;
+        found.push({ name: fixCaps(words.join(" ")) + " " + titleCase(m[2]), idx: i });
+      }
+    });
+    if (!found.length) return "";
+    if (nearIdx >= 0) {
+      const after = found.find(c => c.idx >= nearIdx && c.idx <= nearIdx + 6);
+      if (after) return after.name;
+    }
+    return found[0].name;
+  }
+
+  function parse(text) {
+    const lines = text.split(/\r?\n/).map(l => l.replace(/[\u00a0\t]/g, " ")).filter(l => l.trim());
+    const { age, idx: ageIdx } = findAge(lines);
+    const name = fixCaps(findName(lines, ageIdx));
+    const phones = findPhones(lines);
+    const addrs = findAddresses(lines);
+    const curIdx = lines.findIndex(l => /^\s*current (home )?address/i.test(l));
+    let addr = null;
+    const withStreet = addrs.filter(a => a.street);
+    const pool = withStreet.length ? withStreet : addrs;
+    if (curIdx >= 0) addr = pool.find(a => a.idx > curIdx) || null;
+    if (!addr) addr = pool[0] || null;
+    const county = findCounty(lines, addr ? addr.idx : -1);
+    return {
+      name, age,
+      phones,
+      address: addr ? (addr.street ? addr.street + ", " : "") + `${addr.city}, ${addr.state} ${addr.zip}` : "",
+      county
+    };
+  }
+
+  function firstLast(name) {
+    const w = name.split(" ").filter(Boolean);
+    if (w.length <= 2) return name;
+    let k = SUFFIX_NAME.test(w[w.length - 1]) ? w.length - 2 : w.length - 1;
+    while (k > 1 && /^(de|la|van|von|del|da|di|le|du)$/i.test(w[k - 1])) k--;
+    return [w[0], ...w.slice(k)].join(" ");
+  }
+
+  const fmtPhone = (d, style) => !d ? "" : style === "pretty" ? `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}` : d;
+
+  return { parse, firstLast, fmtPhone };
+})();
+
+</script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const raw = $("raw"), copyAll = $("copyAll"), alts = $("alts");
+  const F = { name: $("f-name"), age: $("f-age"), phone: $("f-phone"), address: $("f-address"), county: $("f-county") };
+  const LABEL = { name: "Name", age: "Age", phone: "Phone #", address: "Address", county: "County" };
+  const COPY_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
+  const CHECK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>';
+  document.querySelectorAll(".field button").forEach(b => b.innerHTML = COPY_ICON);
+
+  // Settings (saved when the browser allows it)
+  const store = {
+    get: k => { try { return localStorage.getItem(k); } catch { return null; } },
+    set: (k, v) => { try { localStorage.setItem(k, v); } catch {} }
+  };
+  const optFL = $("optFirstLast"), optPretty = $("optPretty");
+  optFL.checked = store.get("fl") === "1";
+  optPretty.checked = store.get("pretty") === "1";
+
+  let last = null, phoneIdx = 0;
+
+  function render() {
+    const r = last;
+    if (!r) { Object.values(F).forEach(i => i.value = ""); alts.innerHTML = ""; markMissing(); return; }
+    F.name.value = optFL.checked ? Parser.firstLast(r.name) : r.name;
+    F.age.value = r.age;
+    const p = r.phones[phoneIdx];
+    F.phone.value = p ? Parser.fmtPhone(p.digits, optPretty.checked ? "pretty" : "digits") : "";
+    F.address.value = r.address;
+    F.county.value = r.county;
+    alts.innerHTML = "";
+    if (r.phones.length > 1) {
+      r.phones.forEach((ph, i) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = i === phoneIdx ? "on" : "";
+        b.textContent = Parser.fmtPhone(ph.digits, "pretty") + (ph.type ? " (" + ph.type + ")" : "");
+        b.setAttribute("aria-pressed", i === phoneIdx);
+        b.onclick = () => { phoneIdx = i; render(); };
+        alts.appendChild(b);
+      });
+    }
+    markMissing();
+  }
+
+  function markMissing() {
+    let any = false;
+    for (const k in F) {
+      const has = F[k].value.trim() !== "";
+      F[k].closest(".field").classList.toggle("missing", !has && raw.value.trim() !== "");
+      any = any || has;
+    }
+    copyAll.disabled = !any;
+    $("hint").hidden = raw.value.trim() !== "";
+  }
+
+  function run() {
+    const t = raw.value;
+    phoneIdx = 0;
+    last = t.trim() ? Parser.parse(t) : null;
+    render();
+  }
+
+  let timer;
+  raw.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(run, 120); });
+  Object.values(F).forEach(i => i.addEventListener("input", markMissing));
+  optFL.onchange = () => { store.set("fl", optFL.checked ? "1" : "0"); render(); };
+  optPretty.onchange = () => { store.set("pretty", optPretty.checked ? "1" : "0"); render(); };
+
+  $("clearBtn").onclick = () => { raw.value = ""; run(); raw.focus(); };
+
+  $("pasteBtn").onclick = async () => {
+    try {
+      const t = await navigator.clipboard.readText();
+      if (t) { raw.value = t; run(); return; }
+    } catch {}
+    raw.focus();
+    flash($("pasteBtn"), "Long-press the box to paste", 2000, false);
+  };
+
+  function resultText() {
+    return Object.keys(F).map(k => `${LABEL[k]}: ${F[k].value.trim() || "N/A"}`).join("\n");
+  }
+
+  async function writeClip(text) {
+    try { await navigator.clipboard.writeText(text); return true; } catch {}
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.setAttribute("readonly", ""); ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    let ok = false; try { ok = document.execCommand("copy"); } catch {}
+    ta.remove(); return ok;
+  }
+
+  function flash(btn, text, ms = 1500, good = true, html = false) {
+    const prev = btn.innerHTML;
+    html ? (btn.innerHTML = text) : (btn.textContent = text);
+    if (good) btn.classList.add("done");
+    setTimeout(() => { btn.innerHTML = prev; btn.classList.remove("done"); }, ms);
+  }
+
+  copyAll.onclick = async () => {
+    const ok = await writeClip(resultText());
+    flash(copyAll, ok ? "Copied!" : "Copy blocked — select text manually", 1500, ok);
+  };
+
+  document.querySelectorAll(".field button").forEach(b => {
+    b.onclick = async () => {
+      const v = b.parentElement.querySelector("input").value.trim();
+      if (!v) return;
+      if (await writeClip(v)) flash(b, CHECK_ICON, 1200, true, true);
+    };
+  });
+
+  // Offline support when served over http(s), e.g. GitHub Pages
+  const net = $("net");
+  if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+    navigator.serviceWorker.register("sw.js").then(() => navigator.serviceWorker.ready)
+      .then(() => { net.textContent = "Ready offline"; net.classList.add("ready"); })
+      .catch(() => {});
+  } else if (location.protocol === "file:") {
+    net.textContent = "Offline file"; net.classList.add("ready");
+  }
+
+  run();
+})();
+</script>
+</body>
+</html>
