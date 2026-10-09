@@ -1,6 +1,6 @@
 {
-  "name": "TPS Parser Pro",
-  "short_name": "TPS Parser",
+  "name": "TPS Notes",
+  "short_name": "TPS Notes",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
