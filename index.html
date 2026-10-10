@@ -154,6 +154,7 @@
     <label><input type="checkbox" id="optFirstLast"> First + last name only</label>
     <label><input type="checkbox" id="optPretty"> Phone as (847) 549-6228</label>
     <label><input type="checkbox" id="optAutoClear"> Clear box after adding to a note</label>
+    <label><input type="checkbox" id="optAutoPaste"> Auto-paste copied profiles when the app opens</label>
   </div>
   <p class="empty" id="hint">Fields fill in as soon as you paste. You can edit any field before copying.</p>
   <div class="card">
@@ -569,7 +570,10 @@ const Parser = (() => {
   optAuto.onchange = () => store.set("autoclear", optAuto.checked ? "1" : "0");
   $("clearBtn").onclick = () => { raw.value = ""; run(); raw.focus(); };
   $("pasteBtn").onclick = async () => {
-    try { const t = await navigator.clipboard.readText(); if (t) { raw.value = t; run(); return; } } catch {}
+    try {
+      const t = await navigator.clipboard.readText();
+      if (t) { importText(t); return; }
+    } catch {}
     raw.focus(); toast("Long-press the box to paste");
   };
   const resultText = () => Object.keys(F).map(k => `${LABEL[k]}: ${F[k].value.trim() || "N/A"}`).join("\n");
@@ -617,6 +621,34 @@ const Parser = (() => {
       .then(() => { net.textContent = "Ready offline"; net.classList.add("ready"); }).catch(() => {});
   } else if (location.protocol === "file:") { net.textContent = "Offline file"; net.classList.add("ready"); }
 
+  /* ---------- importing text (Paste button, auto-paste, share) ---------- */
+  const optClip = $("optAutoPaste");
+  optClip.checked = store.get("autopaste") !== "0";
+  optClip.onchange = () => { store.set("autopaste", optClip.checked ? "1" : "0"); if (optClip.checked) checkClipboard(); };
+  const hash = s => { let h = 5381; for (let i = 0; i < s.length; i++) h = (h * 33 ^ s.charCodeAt(i)) >>> 0; return h.toString(36) + s.length; };
+  const looksLikeProfile = r => !!(r.name || r.age) && !!(r.phones.length || r.address);
+  function importText(t) {
+    store.set("lastclip", hash(t.trim()));
+    if (!views.note.hidden) history.back();
+    if (!$("sheet").hidden) closeSheet();
+    raw.value = t; run(); show("parser");
+    if (!copyAll.disabled) setTimeout(openSheet, 60); else toast("Couldn't find any fields in that text");
+  }
+  let checking = false;
+  async function checkClipboard() {
+    if (!optClip.checked || checking || document.visibilityState !== "visible") return;
+    if (!navigator.clipboard || !navigator.clipboard.readText) return;
+    if (!$("sheet").hidden || !views.note.hidden) return;   // don't interrupt the menu or note editing
+    checking = true;
+    try {
+      const t = ((await navigator.clipboard.readText()) || "").trim();
+      if (!t || hash(t) === store.get("lastclip")) return;  // already imported this exact text
+      if (!looksLikeProfile(Parser.parse(t))) return;       // ignore clipboard text that isn't a profile
+      importText(t);
+    } catch { /* permission not granted yet: the Paste button still works and grants it */ }
+    finally { checking = false; }
+  }
+
   /* ---------- text shared from another app (Chrome: select text > Share > TPS Notes) ---------- */
   const q = new URLSearchParams(location.search);
   const shared = [q.get("title"), q.get("text")].filter(Boolean).join("\n").trim();
@@ -627,6 +659,11 @@ const Parser = (() => {
     show("parser");
     if (!copyAll.disabled) openSheet(); else toast("Couldn't find any fields in the shared text");
   } else run();
+
+  /* ---------- auto-paste: read the clipboard whenever the app comes to the front ---------- */
+  if (!shared) checkClipboard();
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") checkClipboard(); });
+  window.addEventListener("focus", () => checkClipboard());
 })();
 </script>
 </body>
