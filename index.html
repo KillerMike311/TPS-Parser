@@ -275,7 +275,6 @@ const Parser = (() => {
   function findPhones(lines) {
     const re = /(?:\+?1[\s.\-]?)?\(?\b([2-9]\d{2})\)?[\s.\-]?([2-9]\d{2})[\s.\-]?(\d{4})\b/g;
     const out = [], seen = new Set();
-    let sectionIdx = lines.findIndex(l => /^\s*(phone numbers?|phones?|current phone|primary phone)\b/i.test(l));
     lines.forEach((l, i) => {
       let m; re.lastIndex = 0;
       while ((m = re.exec(l))) {
@@ -286,15 +285,8 @@ const Parser = (() => {
         out.push({ digits: d, type: t ? titleCase(t) : "", idx: i });
       }
     });
-    // Drop landlines entirely
-    const kept = out.filter(p => p.type !== "Landline");
-    // Primary = first wireless number (in the phone section if there is one), else first remaining number
-    const isWireless = p => /^(wireless|mobile|cell)$/i.test(p.type);
-    let first = kept.findIndex(p => isWireless(p) && (sectionIdx < 0 || p.idx >= sectionIdx));
-    if (first < 0) first = kept.findIndex(isWireless);
-    if (first < 0 && sectionIdx >= 0) first = kept.findIndex(p => p.idx >= sectionIdx);
-    if (first > 0) kept.unshift(kept.splice(first, 1)[0]);
-    return kept;
+    // Keep page order exactly as the numbers appear; drop landlines only
+    return out.filter(p => p.type !== "Landline");
   }
 
   function splitStreetCity(s) {
@@ -625,7 +617,16 @@ const Parser = (() => {
       .then(() => { net.textContent = "Ready offline"; net.classList.add("ready"); }).catch(() => {});
   } else if (location.protocol === "file:") { net.textContent = "Offline file"; net.classList.add("ready"); }
 
-  run();
+  /* ---------- text shared from another app (Chrome: select text > Share > TPS Notes) ---------- */
+  const q = new URLSearchParams(location.search);
+  const shared = [q.get("title"), q.get("text")].filter(Boolean).join("\n").trim();
+  if (q.has("text") || q.has("title")) history.replaceState(null, "", location.pathname);
+  if (shared) {
+    raw.value = shared;
+    run();
+    show("parser");
+    if (!copyAll.disabled) openSheet(); else toast("Couldn't find any fields in the shared text");
+  } else run();
 })();
 </script>
 </body>
