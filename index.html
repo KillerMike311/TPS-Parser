@@ -49,7 +49,7 @@
     padding: 14px; font: inherit; font-size: .95rem;
   }
   #raw { height: 28vh; min-height: 150px; }
-  #noteBody { height: 58vh; min-height: 240px; line-height: 1.5; }
+  #noteBody { height: 58vh; min-height: 240px; line-height: 1.5; padding-right: 72px; }
   textarea:focus, .text:focus { outline: none; border-color: var(--amber); }
 
   .row { display: flex; gap: 10px; margin-top: 10px; }
@@ -100,6 +100,15 @@
   .noteHead { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
   .noteHead button { flex: none; padding: 0 12px; }
   .meta { font-size: .82rem; color: var(--muted); margin: 8px 2px 0; }
+  .jump {
+    position: fixed; right: max(22px, calc((100vw - 560px) / 2 + 22px)); top: 46%; transform: translateY(-50%);
+    display: flex; flex-direction: column; gap: 10px; z-index: 5;
+  }
+  .jump button {
+    width: 52px; height: 52px; min-height: 52px; padding: 0; border-radius: 50%;
+    display: grid; place-items: center; box-shadow: 0 4px 14px rgba(0, 0, 0, .35);
+  }
+  .jump button svg { width: 24px; height: 24px; }
 
   .dock {
     position: fixed; left: 0; right: 0; bottom: 0;
@@ -184,6 +193,10 @@
   <label for="noteBody" class="sr">Note text</label>
   <textarea id="noteBody" spellcheck="false"></textarea>
   <p class="meta" id="noteMeta"></p>
+  <div class="jump">
+    <button id="jumpTop" type="button" aria-label="Go to top of note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+    <button id="jumpBottom" type="button" class="primary" aria-label="Go to bottom of note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+  </div>
   <div class="row">
     <button id="noteCopy" type="button">Copy all</button>
     <button id="noteShare" type="button">Share</button>
@@ -491,6 +504,23 @@ const Parser = (() => {
   }
   $("newNoteBtn").onclick = () => { openNote(createNote("Note " + (notes.length + 1))); $("noteTitle").select(); };
   $("noteBack").onclick = () => history.back();
+
+  // Jump buttons: bottom puts the cursor at the very end, ready to edit; top goes back to the start
+  const jumpBtns = [$("jumpTop"), $("jumpBottom")];
+  jumpBtns.forEach(b => b.addEventListener("mousedown", e => e.preventDefault())); // keep keyboard open
+  $("jumpBottom").onclick = () => {
+    const ta = $("noteBody"), end = ta.value.length;
+    ta.focus({ preventScroll: true });
+    ta.setSelectionRange(end, end);
+    ta.scrollTop = ta.scrollHeight;
+    ta.scrollIntoView({ block: "end" });
+  };
+  $("jumpTop").onclick = () => {
+    const ta = $("noteBody");
+    if (document.activeElement === ta) ta.setSelectionRange(0, 0);
+    ta.scrollTop = 0;
+    window.scrollTo(0, 0);
+  };
   let editTimer;
   function flushNote() {
     clearTimeout(editTimer);
