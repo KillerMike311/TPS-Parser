@@ -1,4 +1,4 @@
-const CACHE = "tps-notes-v6";
+const CACHE = "tps-notes-v7";
 const FILES = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 
 // Always pull fresh copies (skip the browser's HTTP cache) when installing
