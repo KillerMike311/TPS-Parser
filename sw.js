@@ -1,4 +1,4 @@
-const CACHE = "tps-notes-v7";
+const CACHE = "tps-notes-v8";
 const FILES = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 
 // Always pull fresh copies (skip the browser's HTTP cache) when installing
@@ -14,6 +14,14 @@ self.addEventListener("activate", e => {
 // Network first (so updates show up right away), cached copy when offline
 self.addEventListener("fetch", e => {
   if (e.request.method !== "GET") return;
+
+  // Shared text arrives in the address (?text=...). Long shares make the address too long for
+  // GitHub's server ("URI Too Long"), so answer these from the copy saved on the phone instead.
+  const url = new URL(e.request.url);
+  if (e.request.mode === "navigate" && (url.searchParams.has("text") || url.searchParams.has("title"))) {
+    e.respondWith(caches.match("./").then(r => r || fetch("./", { cache: "no-store" })));
+    return;
+  }
   e.respondWith(
     fetch(e.request, { cache: "no-store" })
       .then(res => {
